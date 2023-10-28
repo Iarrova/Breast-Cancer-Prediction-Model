@@ -11,18 +11,27 @@ import tensorflow as tf
 print("[INFO] Successfully imported Tensorflow version: {}".format(tf.__version__))
 print("[DEBUG] Checking for GPU... {}".format(tf.config.list_physical_devices("GPU")))
 
+# Set GPU memory to growth
+gpus = tf.config.list_logical_devices("GPU")
+if gpus:
+    try:
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+        logical_gpus = tf.config.list_logical_devices("GPU")
+        print(len(gpus), "Physical GPUs, ", len(logical_gpus), "Logical GPUs")
+    except RuntimeError as e:
+        print(e)
+
 parser = argparse.ArgumentParser(description="Patch neural network training for breast cancer prediction.")
 parser.add_argument("dataset", help="The patch dataset we want to train on.")
-parser.add_argument("model")
-parser.add_argument("dropout")
 
 args = parser.parse_args()
 
-BATCH_SIZE = 32
+BATCH_SIZE = 64
 IMG_SIZE = (224, 224)
     
 train_dataset = tf.keras.utils.image_dataset_from_directory(
-    os.path.join("../Datasets/", args.dataset, "train/"),
+    os.path.join("../datasets/", args.dataset, "train/"),
     shuffle=True,
     batch_size=BATCH_SIZE,
     image_size=IMG_SIZE,
@@ -30,7 +39,7 @@ train_dataset = tf.keras.utils.image_dataset_from_directory(
 )
 
 validation_dataset = tf.keras.utils.image_dataset_from_directory(
-    os.path.join("../Datasets/", args.dataset, "validation/"),
+    os.path.join("../datasets/", args.dataset, "validation/"),
     shuffle=True,
     batch_size=BATCH_SIZE,
     image_size=IMG_SIZE,
@@ -38,7 +47,7 @@ validation_dataset = tf.keras.utils.image_dataset_from_directory(
 )
 
 test_dataset = tf.keras.utils.image_dataset_from_directory(
-    os.path.join("../Datasets/", args.dataset, "test/"),
+    os.path.join("../datasets/", args.dataset, "test/"),
     shuffle=True,
     batch_size=BATCH_SIZE,
     image_size=IMG_SIZE,
@@ -81,13 +90,10 @@ x = data_augmentation(inputs)
 x = preprocess_input(x)
 x = base_model(x, training=False)
 x = tf.keras.layers.GlobalAveragePooling2D()(x)
-if args.dropout == "dropout": 
-    x = tf.keras.layers.Dropout(0.3)(x)
-if args.model == "base":
-    outputs = tf.keras.layers.Dense(5, activation="softmax")(x)
-else:
-    x = tf.keras.layers.Dense(512)(x)
-    outputs = tf.keras.layers.Dense(5, activation="softmax")(x)
+x = tf.keras.layers.Dropout(0.2)(x)
+x = tf.keras.layers.Dense(512)(x)
+x = tf.keras.layers.Dropout(0.5)(x)
+outputs = tf.keras.layers.Dense(5, activation="softmax")(x)
 model = tf.keras.Model(inputs, outputs)
 
 # Compile the model
@@ -119,7 +125,7 @@ history = model.fit(
 )
 
 # Save the history
-with open("../models/histories/" + args.dataset + "/" + args.model + "_" + args.dropout + "/" + "1.pkl", 'wb') as file:
+with open("../models/histories/" + args.dataset + "/" + "1.pkl", 'wb') as file:
     pickle.dump(history.history, file)
 
 # Fine tuning
@@ -143,7 +149,7 @@ history = model.fit(
     class_weight=class_weights)
 
 # Save the history
-with open("../models/histories/" + args.dataset + "/" + args.model + "_" + args.dropout + "/" + "2.pkl", 'wb') as file:
+with open("../models/histories/" + args.dataset + "/" + "2.pkl", 'wb') as file:
     pickle.dump(history.history, file)
 
 # Finish Training
@@ -158,7 +164,7 @@ model.compile(
 
 # Early stopping and weight saving
 checkpoint = tf.keras.callbacks.ModelCheckpoint(
-    filepath = "../models/weights/patches/" + args.model + "_" + args.dropout + "/" + args.dataset + ".h5",
+    filepath = "../models/weights/patches/" + args.dataset + "/" + ".h5",
     monitor = "val_loss",
     save_best_only = True,
     verbose = 1
@@ -182,5 +188,5 @@ history = model.fit(
 )
 
 # Save the history
-with open("../models/histories/" + args.dataset + "/" + args.model + "_" + args.dropout + "/" + "3.pkl", 'wb') as file:
+with open("../models/histories/" + args.dataset + "/" + "3.pkl", 'wb') as file:
     pickle.dump(history.history, file)
